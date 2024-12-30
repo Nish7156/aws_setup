@@ -1,3 +1,26 @@
+# # name: Deploy to EC2
+
+# # on:
+# #   push:
+# #     branches:
+# #       - staging
+
+# # jobs:
+# #   deploy:
+# #     runs-on: ubuntu-latest
+
+# #     steps:
+# #     - name: Checkout code
+# #       uses: actions/checkout@v3
+
+# #     - name: Deploy to EC2
+# #       env:
+# #         EC2_HOST: 54.159.147.88/
+# #         EC2_USER: ec2-user
+# #       run: |
+# #         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
+
+
 # name: Deploy to EC2
 
 # on:
@@ -13,13 +36,17 @@
 #     - name: Checkout code
 #       uses: actions/checkout@v3
 
+#     - name: Setup SSH
+#       uses: webfactory/ssh-agent@v0.5.3
+#       with:
+#         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
 #     - name: Deploy to EC2
 #       env:
-#         EC2_HOST: 54.159.147.88/
+#         EC2_HOST: 54.159.147.88
 #         EC2_USER: ec2-user
 #       run: |
-#         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
-
+#         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
 
 name: Deploy to EC2
 
@@ -35,6 +62,12 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+
+    - name: Create SSH key file
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
 
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.5.3
