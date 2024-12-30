@@ -167,8 +167,8 @@ jobs:
     - name: Upload to S3
       uses: jakejarvis/s3-sync-action@v0.5.0
       with:
-        aws_access_key_id: AKIAQF5UVPYBU3DZKN4A  # AWS credentials
-        aws_secret_access_key: Z2H0e1w3fxcWz0MVBZ+8C+Zo+I/avVHksk/5i+0Y
+        aws_access_key_id: 123  # AWS credentials
+        aws_secret_access_key: 123
         bucket: aws-setup-7156  # Your S3 bucket name
         region: us-east-1  # AWS region
         source_dir: ./build  # React build directory
