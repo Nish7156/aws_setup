@@ -1,3 +1,53 @@
+# # # # name: Deploy to EC2
+
+# # # # on:
+# # # #   push:
+# # # #     branches:
+# # # #       - staging
+
+# # # # jobs:
+# # # #   deploy:
+# # # #     runs-on: ubuntu-latest
+
+# # # #     steps:
+# # # #     - name: Checkout code
+# # # #       uses: actions/checkout@v3
+
+# # # #     - name: Deploy to EC2
+# # # #       env:
+# # # #         EC2_HOST: 54.159.147.88/
+# # # #         EC2_USER: ec2-user
+# # # #       run: |
+# # # #         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
+
+
+# # # name: Deploy to EC2
+
+# # # on:
+# # #   push:
+# # #     branches:
+# # #       - staging
+
+# # # jobs:
+# # #   deploy:
+# # #     runs-on: ubuntu-latest
+
+# # #     steps:
+# # #     - name: Checkout code
+# # #       uses: actions/checkout@v3
+
+# # #     - name: Setup SSH
+# # #       uses: webfactory/ssh-agent@v0.5.3
+# # #       with:
+# # #         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+# # #     - name: Deploy to EC2
+# # #       env:
+# # #         EC2_HOST: 54.159.147.88
+# # #         EC2_USER: ec2-user
+# # #       run: |
+# # #         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
+
 # # name: Deploy to EC2
 
 # # on:
@@ -13,15 +63,26 @@
 # #     - name: Checkout code
 # #       uses: actions/checkout@v3
 
+# #     - name: Create SSH key file
+# #       run: |
+# #         mkdir -p ~/.ssh
+# #         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+# #         chmod 600 ~/.ssh/id_rsa
+
+# #     - name: Setup SSH
+# #       uses: webfactory/ssh-agent@v0.5.3
+# #       with:
+# #         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
 # #     - name: Deploy to EC2
 # #       env:
-# #         EC2_HOST: 54.159.147.88/
+# #         EC2_HOST: 54.159.147.88
 # #         EC2_USER: ec2-user
 # #       run: |
-# #         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
+# #         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
 
 
-# name: Deploy to EC2
+# name: Deploy to EC2 via S3
 
 # on:
 #   push:
@@ -36,47 +97,80 @@
 #     - name: Checkout code
 #       uses: actions/checkout@v3
 
-#     - name: Setup SSH
-#       uses: webfactory/ssh-agent@v0.5.3
+#     - name: Set up AWS CLI
+#       uses: aws-actions/configure-aws-credentials@v2
 #       with:
-#         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         aws-region: ${{ secrets.AWS_REGION }}
 
-#     - name: Deploy to EC2
-#       env:
-#         EC2_HOST: 54.159.147.88
-#         EC2_USER: ec2-user
+#     - name: Upload to S3
 #       run: |
-#         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
+#         aws s3 cp ./path/to/your/code s3://your-bucket-name/ --recursive
 
-name: Deploy to EC2
+#     - name: Trigger EC2 to Pull from S3
+#       run: |
+#         aws ssm send-command \
+#           --instance-ids "i-xxxxxxxxxxxxxx" \
+#           --document-name "AWS-RunShellScript" \
+#           --comment "Download code from S3 and update app" \
+#           --parameters 'commands=["aws s3 cp s3://your-bucket-name/ ./path/to/your/code --recursive", "restart-service command"]'
+
+
+
+name: Auto Deploy to EC2 and S3
 
 on:
   push:
     branches:
-      - staging
+      - main  # Automatically trigger on push to the main branch
+      - staging  # Optionally, add a staging branch if you want to auto-deploy on staging merge
+  # This could also be set up to trigger on a pull request merge, but `push` is common.
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+    # Checkout the repository
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Create SSH key file
-      run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.5.3
+    
+    # Set up Node.js environment
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-    - name: Deploy to EC2
-      env:
-        EC2_HOST: 54.159.147.88
-        EC2_USER: ec2-user
+        node-version: '16'  # Specify the Node.js version
+    
+    # Install dependencies and build the React app
+    - name: Install dependencies and build
       run: |
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
+        npm install
+        npm run build  # Build your React app
+    
+    # Deploy to EC2 (via SSH)
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_IP }}  # Public IP of EC2
+        username: ${{ secrets.EC2_USER }}  # EC2 SSH username
+        key: ${{ secrets.EC2_SSH_KEY }}  # SSH private key
+        port: 22
+        script: |
+          cd /path/to/your/app  # Navigate to your app directory on EC2
+          git pull origin ${{ github.ref }}  # Pull the latest changes from the merged branch
+          npm install  # Install dependencies
+          npm run build  # Rebuild the app
+          pm2 restart react-app || pm2 start npm --name "react-app" -- start  # Restart the app (pm2 or other)
+    
+    # Optionally: Upload static assets to S3
+    - name: Upload to S3
+      uses: jakejarvis/s3-sync-action@v0.5.0
+      with:
+        aws_access_key_id: AKIAQF5UVPYBU3DZKN4A  # AWS credentials
+        aws_secret_access_key: Z2H0e1w3fxcWz0MVBZ+8C+Zo+I/avVHksk/5i+0Y
+        bucket: aws-setup-7156  # Your S3 bucket name
+        region: us-east-1  # AWS region
+        source_dir: ./build  # React build directory
+        dest_dir: /  # S3 destination path
+        acl: public-read  # Set appropriate permissions for public access
