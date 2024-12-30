@@ -1,3 +1,25 @@
+# name: Deploy to EC2
+
+# on:
+#   push:
+#     branches:
+#       - staging
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v3
+
+#     - name: Deploy to EC2
+#       env:
+#         EC2_HOST: 54.159.147.88/
+#         EC2_USER: ec2-user
+#       run: |
+#         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
+
 name: Deploy to EC2
 
 on:
@@ -15,7 +37,7 @@ jobs:
 
     - name: Deploy to EC2
       env:
-        EC2_HOST: 54.159.147.88/
+        EC2_HOST: 54.159.147.88
         EC2_USER: ec2-user
       run: |
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash -s" < ./deploy.sh
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "bash /home/ec2-user/deploy.sh"
